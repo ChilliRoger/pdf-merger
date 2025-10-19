@@ -1,14 +1,13 @@
 # PDF Merger
 
-A web application built with Flask that allows users to merge multiple PDF files into a single document. The application features a clean, responsive user interface and can be deployed on Vercel.
-
+A web application built with Flask that allows users to merge multiple PDF files into a single document. 
 ## Features
 
 - **Multiple PDF Upload**: Upload and merge 2-50 PDF files at once
 - **Responsive Design**: Modern, mobile-friendly interface with gradient backgrounds
 - **File Management**: Automatic cleanup of uploaded files after processing
 - **Download Support**: Direct download of merged PDF files
-- **Vercel Deployment**: Ready for deployment on Vercel platform
+
 
 ## Project Structure
 
@@ -167,6 +166,4 @@ The application uses modern CSS features including:
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Support
 
-For support, please open an issue in the repository or contact the maintainer.
