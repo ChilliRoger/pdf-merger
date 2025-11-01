@@ -235,6 +235,19 @@
     font-size: 1.1rem;
     box-shadow: 0 2px 8px rgba(220, 53, 69, 0.4);
   }
+  
+  /* Loading spinner */
+  .loading-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #007bff;
+    font-weight: 600;
+  }
+  .page-preview img {
+    display: block !important;
+  }
 
   @media (max-width: 768px) {
     .pages-container { grid-template-columns: 1fr; }
@@ -258,8 +271,8 @@
       {% for page_num in range(1, total_pages + 1) %}
       <div class="page-card" id="page-{{ page_num }}" data-page="{{ page_num }}">
         <div class="page-number">Page {{ page_num }}</div>
-        <div class="page-preview">
-          <img src="/page-image/{{ session_id }}/{{ page_num }}" alt="Page {{ page_num }}" loading="lazy">
+        <div class="page-preview" id="preview-{{ page_num }}">
+          <div class="loading-spinner">Loading page {{ page_num }}...</div>
         </div>
         <div class="page-actions">
           <button type="button" class="btn btn-remove" onclick="removePage({{ page_num }})">
@@ -281,6 +294,65 @@
   <script>
     let removedPages = new Set();
     let insertions = {};
+    
+    // Load page images progressively
+    document.addEventListener('DOMContentLoaded', function() {
+      const totalPages = {{ total_pages }};
+      const sessionId = '{{ session_id }}';
+      
+      // Load images one by one with delay to avoid overwhelming the server
+      function loadPageImage(pageNum) {
+        const preview = document.getElementById('preview-' + pageNum);
+        const img = document.createElement('img');
+        
+        img.onload = function() {
+          preview.innerHTML = '';
+          preview.appendChild(img);
+        };
+        
+        img.onerror = function() {
+          preview.innerHTML = '<div style="color: #dc3545; padding: 2rem;">Failed to load page ' + pageNum + '<br><button onclick="retryLoadPage(' + pageNum + ')" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 0.5rem; cursor: pointer;">Retry</button></div>';
+        };
+        
+        img.src = '/page-image/' + sessionId + '/' + pageNum;
+        img.alt = 'Page ' + pageNum;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        img.style.objectFit = 'contain';
+      }
+      
+      // Load pages with a small delay between each
+      for (let i = 1; i <= totalPages; i++) {
+        setTimeout(() => loadPageImage(i), (i - 1) * 150);
+      }
+    });
+    
+    function retryLoadPage(pageNum) {
+      const preview = document.getElementById('preview-' + pageNum);
+      preview.innerHTML = '<div class="loading-spinner">Loading page ' + pageNum + '...</div>';
+      setTimeout(() => loadPageImage(pageNum), 100);
+    }
+    
+    function loadPageImage(pageNum) {
+      const sessionId = '{{ session_id }}';
+      const preview = document.getElementById('preview-' + pageNum);
+      const img = document.createElement('img');
+      
+      img.onload = function() {
+        preview.innerHTML = '';
+        preview.appendChild(img);
+      };
+      
+      img.onerror = function() {
+        preview.innerHTML = '<div style="color: #dc3545; padding: 2rem;">Failed to load page ' + pageNum + '<br><button onclick="retryLoadPage(' + pageNum + ')" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 0.5rem; cursor: pointer;">Retry</button></div>';
+      };
+      
+      img.src = '/page-image/' + sessionId + '/' + pageNum;
+      img.alt = 'Page ' + pageNum;
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '100%';
+      img.style.objectFit = 'contain';
+    }
 
     function removePage(pageNum) {
       const pageCard = document.getElementById('page-' + pageNum);

@@ -105,25 +105,40 @@ def page_image(session_id, page_num):
     try:
         pdf_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'original.pdf')
         
+        # Check if file exists
+        if not os.path.exists(pdf_path):
+            return "PDF not found", 404
+        
         # Open PDF with PyMuPDF
         doc = fitz.open(pdf_path)
+        
+        # Validate page number
+        if page_num < 1 or page_num > len(doc):
+            doc.close()
+            return "Invalid page number", 404
+        
         page = doc[page_num - 1]  # PyMuPDF uses 0-based indexing
         
-        # Render page to image
-        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))  # 1.5x zoom for better quality
-        img_data = pix.tobytes("png")
+        # Render page to image with lower quality for faster loading
+        # Reduced from 1.5 to 1.0 for faster generation and smaller file size
+        pix = page.get_pixmap(matrix=fitz.Matrix(1.0, 1.0), alpha=False)
+        
+        # Convert to JPEG for smaller file size (faster loading)
+        img_data = pix.tobytes("jpeg", jpg_quality=75)
         
         doc.close()
         
         return send_file(
             io.BytesIO(img_data),
-            mimetype='image/png',
-            as_attachment=False
+            mimetype='image/jpeg',
+            as_attachment=False,
+            download_name=f'page_{page_num}.jpg'
         )
     except Exception as e:
-        print(f"Error generating page image: {e}")
-        # Return a placeholder image or error
-        return "Error", 500
+        print(f"Error generating page image for page {page_num}: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error generating image: {str(e)}", 500
 
 
 @app.route('/apply-edits', methods=['POST'])
