@@ -1,15 +1,21 @@
-from flask import Flask, render_template, request, send_file, redirect, url_for
-from PyPDF2 import PdfMerger
+from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify
+from PyPDF2 import PdfMerger, PdfReader, PdfWriter
 import os
 import uuid
 from werkzeug.utils import secure_filename
+import io
+from PIL import Image
+import fitz  # PyMuPDF
+import json
 
 app = Flask(__name__, template_folder='../templates')
 app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
 app.config['MERGED_FOLDER'] = '/tmp/merged'
+app.config['EDIT_FOLDER'] = '/tmp/edit_sessions'
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['MERGED_FOLDER'], exist_ok=True)
+os.makedirs(app.config['EDIT_FOLDER'], exist_ok=True)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -57,6 +63,122 @@ def download():
 @app.route('/restart', methods=['GET'])
 def restart():
     return redirect(url_for('index'))
+
+
+# PDF EDITING ROUTES
+
+@app.route('/edit-mode', methods=['GET'])
+def edit_mode():
+    """Show the upload page for PDF editing"""
+    return render_template('upload_for_edit.html')
+
+
+@app.route('/process-upload-for-edit', methods=['POST'])
+def process_upload_for_edit():
+    """Process uploaded PDF and show page editor"""
+    pdf_file = request.files.get('pdf_file')
+    
+    if not pdf_file or pdf_file.filename == '':
+        return redirect(url_for('edit_mode'))
+    
+    # Create unique session ID
+    session_id = uuid.uuid4().hex
+    session_dir = os.path.join(app.config['EDIT_FOLDER'], session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    
+    # Save uploaded PDF
+    pdf_path = os.path.join(session_dir, 'original.pdf')
+    pdf_file.save(pdf_path)
+    
+    # Get total pages
+    reader = PdfReader(pdf_path)
+    total_pages = len(reader.pages)
+    
+    return render_template('edit_pages.html', 
+                          session_id=session_id, 
+                          total_pages=total_pages)
+
+
+@app.route('/page-image/<session_id>/<int:page_num>', methods=['GET'])
+def page_image(session_id, page_num):
+    """Generate and serve page preview image"""
+    try:
+        pdf_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'original.pdf')
+        
+        # Open PDF with PyMuPDF
+        doc = fitz.open(pdf_path)
+        page = doc[page_num - 1]  # PyMuPDF uses 0-based indexing
+        
+        # Render page to image
+        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))  # 1.5x zoom for better quality
+        img_data = pix.tobytes("png")
+        
+        doc.close()
+        
+        return send_file(
+            io.BytesIO(img_data),
+            mimetype='image/png',
+            as_attachment=False
+        )
+    except Exception as e:
+        print(f"Error generating page image: {e}")
+        # Return a placeholder image or error
+        return "Error", 500
+
+
+@app.route('/apply-edits', methods=['POST'])
+def apply_edits():
+    """Apply page removals and insertions, then show success page"""
+    try:
+        session_id = request.form.get('session_id')
+        removed_pages_json = request.form.get('removed_pages', '[]')
+        removed_pages = set(json.loads(removed_pages_json))
+        
+        # Load original PDF
+        pdf_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'original.pdf')
+        reader = PdfReader(pdf_path)
+        writer = PdfWriter()
+        
+        # Process each page
+        for page_num in range(1, len(reader.pages) + 1):
+            # Skip removed pages
+            if page_num not in removed_pages:
+                writer.add_page(reader.pages[page_num - 1])
+            
+            # Check for insertions after this page
+            insert_key = f'insert_after_{page_num}'
+            if insert_key in request.files:
+                insert_files = request.files.getlist(insert_key)
+                for insert_file in insert_files:
+                    if insert_file.filename != '':
+                        # Read the inserted PDF
+                        insert_reader = PdfReader(insert_file.stream)
+                        # Add all pages from inserted PDF
+                        for insert_page in insert_reader.pages:
+                            writer.add_page(insert_page)
+        
+        # Save edited PDF
+        output_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'edited.pdf')
+        with open(output_path, 'wb') as output_file:
+            writer.write(output_file)
+        
+        # Return success page instead of direct download
+        return render_template('edit_success.html', session_id=session_id)
+        
+    except Exception as e:
+        print(f"Error applying edits: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/download-edited/<session_id>', methods=['GET'])
+def download_edited(session_id):
+    """Download the edited PDF"""
+    try:
+        output_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'edited.pdf')
+        return send_file(output_path, as_attachment=True, download_name='edited.pdf')
+    except Exception as e:
+        print(f"Error downloading edited PDF: {e}")
+        return "Error downloading file", 500
 
 
 if __name__ == '__main__':

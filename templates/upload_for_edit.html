@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Upload PDF to Edit</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f4f8;
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 1rem;
+  }
+  .container {
+    background: #fff;
+    padding: 2.5rem 3rem;
+    border-radius: 1.5rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    text-align: center;
+    width: 550px;
+    max-width: 90%;
+    animation: fadeIn 0.5s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  h1 { 
+    color: #1a1a1a; 
+    margin-bottom: 0.5rem; 
+    font-weight: 700;
+    font-size: 2rem;
+  }
+  p { 
+    color: #666; 
+    margin-bottom: 2rem;
+    font-size: 1rem;
+  }
+  .upload-area {
+    border: 3px dashed #007bff;
+    padding: 2.5rem;
+    border-radius: 1rem;
+    margin: 1.5rem 0;
+    background: #f8f9fa;
+    transition: all 0.3s;
+  }
+  .upload-area:hover {
+    border-color: #0056b3;
+    background: #e9ecef;
+  }
+  input[type="file"] {
+    width: 100%; 
+    padding: 0.8rem; 
+    font-size: 1rem;
+    border: 2px solid #d0d0d0; 
+    border-radius: 0.7rem;
+    cursor: pointer;
+    background: white;
+    transition: border 0.3s;
+  }
+  input[type="file"]:hover {
+    border-color: #007bff;
+  }
+  button {
+    background: #17a2b8;
+    color: white; 
+    border: none;
+    padding: 1rem 2rem; 
+    border-radius: 0.7rem; 
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer; 
+    transition: all 0.3s ease;
+    margin-top: 1rem;
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+  }
+  button:hover { 
+    background: #138496;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+  }
+  .back-button {
+    background: #6c757d; 
+    padding: 0.7rem 1.2rem;
+    border-radius: 0.7rem;
+    display: inline-block; 
+    margin-bottom: 1rem;
+    text-decoration: none; 
+    color: white;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+  }
+  .back-button:hover { 
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+  }
+
+  @media (max-width: 480px) {
+    .container { width: 95%; padding: 2rem 1.5rem; }
+    h1 { font-size: 1.6rem; }
+    button { font-size: 1rem; padding: 0.9rem 1.5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/" class="back-button">← Back</a>
+  
+  <h1>✂️ Upload PDF to Edit</h1>
+  <p>Upload a PDF file to remove or insert pages</p>
+
+  <form action="/process-upload-for-edit" method="POST" enctype="multipart/form-data">
+    <div class="upload-area">
+      <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
+      <input type="file" name="pdf_file" accept="application/pdf" required>
+    </div>
+    <button type="submit">Upload & Edit →</button>
+  </form>
+</div>
+</body>
+</html>

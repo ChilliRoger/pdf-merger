@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Edited Successfully</title>
+<style>
+  body { 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    background: #f0f4f8; 
+    margin: 0; 
+    min-height: 100vh; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    padding: 2rem 1rem;
+  }
+  .container { 
+    background: #fff; 
+    padding: 3rem 3.5rem; 
+    border-radius: 1.5rem; 
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
+    text-align: center; 
+    width: 450px; 
+    max-width: 90%;
+    animation: fadeIn 0.5s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  h1 { 
+    color: #28a745; 
+    margin-bottom: 1.5rem; 
+    font-weight: 700;
+    font-size: 1.8rem;
+  }
+  .success-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+  a { 
+    display: inline-block; 
+    background: #007bff;
+    color: white; 
+    padding: 1rem 1.8rem; 
+    text-decoration: none; 
+    border-radius: 0.7rem; 
+    margin: 0.5rem; 
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+  }
+  a:hover { 
+    background: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+  }
+  .secondary { 
+    background: #6c757d;
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+  }
+  .secondary:hover { 
+    background: #5a6268;
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+  }
+  .back-button { 
+    background: #6c757d; 
+    padding: 0.7rem 1.2rem; 
+    display: inline-block; 
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+  }
+  .back-button:hover { 
+    background: #5a6268;
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+  }
+
+  @media (max-width: 480px) { 
+    .container { width: 95%; padding: 2rem 1.5rem; }
+    h1 { font-size: 1.5rem; }
+    a, .back-button { font-size: 0.95rem; padding: 0.8rem 1.2rem; }
+    .success-icon { font-size: 3rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="success-icon">✅</div>
+  <h1>PDF Edited Successfully!</h1>
+  <a href="/download-edited/{{ session_id }}">⬇️ Download Edited PDF</a>
+  <a href="/edit-mode" class="secondary">✂️ Edit Another PDF</a>
+  <br><br>
+  <a href="/" class="back-button">← Back to Home</a>
+</div>
+</body>
+</html>

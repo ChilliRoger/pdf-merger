@@ -7,52 +7,361 @@
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #e0ecff, #f8faff);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
       margin: 0;
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
+      padding: 2rem 1rem;
     }
     .container {
       background: #fff;
-      padding: 2rem 2.5rem;
-      border-radius: 1rem;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+      padding: 2.5rem 3rem;
+      border-radius: 1.5rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
       text-align: center;
-      width: 400px;
+      width: 500px;
       max-width: 90%;
+      animation: fadeIn 0.5s ease;
     }
-    h1 { color: #1a1a1a; margin-bottom: 1rem; font-weight: 600; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    h1 { 
+      color: #1a1a1a; 
+      margin-bottom: 0.5rem; 
+      font-weight: 700;
+      font-size: 2rem;
+    }
+    p {
+      color: #666;
+      margin-bottom: 2rem;
+      font-size: 1rem;
+    }
     input[type="number"] {
-      width: 100%; padding: 0.7rem; font-size: 1rem;
-      border: 1px solid #ccc; border-radius: 0.5rem; margin: 1rem 0;
+      width: 100%; 
+      padding: 0.9rem; 
+      font-size: 1rem;
+      border: 2px solid #e0e0e0; 
+      border-radius: 0.7rem; 
+      margin: 1rem 0;
+      transition: border 0.3s;
+    }
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #007bff;
     }
     button {
-      background-color: #007bff; color: #fff; border: none;
-      padding: 0.8rem 1.2rem; border-radius: 0.5rem; font-size: 1rem;
-      cursor: pointer; transition: background 0.2s ease;
+      background: #007bff;
+      color: #fff; 
+      border: none;
+      padding: 0.9rem 1.5rem; 
+      border-radius: 0.7rem; 
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer; 
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
     }
-    button:hover { background-color: #0056b3; }
+    button:hover { 
+      background: #0056b3;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .option-buttons { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 1rem; 
+      margin: 1.5rem 0; 
+    }
+    .option-btn { 
+      width: 100%; 
+      padding: 1.3rem; 
+      font-size: 1.1rem;
+      font-weight: 600;
+      background: #28a745;
+      box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+    }
+    .option-btn:hover { 
+      background: #218838;
+      box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+    }
+    .edit-btn { 
+      background: #17a2b8;
+      box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+    }
+    .edit-btn:hover { 
+      background: #138496;
+      box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+    }
+    .back-btn {
+      background: #6c757d;
+      color: white;
+      padding: 0.6rem 1.2rem;
+      border-radius: 0.7rem;
+      text-decoration: none;
+      display: inline-block;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      transition: all 0.3s;
+      box-shadow: 0 2px 10px rgba(108, 117, 125, 0.3);
+    }
+    .back-btn:hover {
+      background: #5a6268;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(108, 117, 125, 0.5);
+    }
+    
+    /* Help Button */
+    .help-btn {
+      position: fixed;
+      top: 2rem;
+      right: 2rem;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #007bff;
+      color: white;
+      border: none;
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .help-btn:hover {
+      background: #0056b3;
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+    }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 2000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      animation: fadeIn 0.3s ease;
+    }
+    .modal-content {
+      background-color: #fff;
+      margin: 2% auto;
+      padding: 2rem;
+      border-radius: 1rem;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+      animation: slideDown 0.3s ease;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+    @keyframes slideDown {
+      from { transform: translateY(-50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .close-btn {
+      position: absolute;
+      right: 1.5rem;
+      top: 1.5rem;
+      font-size: 2rem;
+      font-weight: bold;
+      color: #999;
+      cursor: pointer;
+      transition: color 0.3s;
+      background: none;
+      border: none;
+      padding: 0;
+      width: auto;
+      line-height: 1;
+    }
+    .close-btn:hover {
+      color: #333;
+      transform: none;
+      box-shadow: none;
+    }
+    .modal-content h2 {
+      color: #007bff;
+      margin-bottom: 1.5rem;
+      padding-right: 2rem;
+    }
+    .help-section {
+      margin-bottom: 1.5rem;
+    }
+    .help-section h3 {
+      color: #333;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .help-section p {
+      color: #666;
+      line-height: 1.6;
+      margin: 0.5rem 0;
+    }
+    .help-section ul {
+      margin: 0.5rem 0;
+      padding-left: 1.5rem;
+    }
+    .help-section li {
+      color: #666;
+      line-height: 1.6;
+      margin: 0.3rem 0;
+    }
+    .feature-icon {
+      font-size: 1.3rem;
+    }
 
     /* Mobile styles */
     @media (max-width: 480px) {
-      .container { width: 95%; padding: 1.5rem 1.5rem; }
-      h1 { font-size: 1.4rem; }
-      input[type="number"] { font-size: 0.95rem; padding: 0.6rem; }
-      button { font-size: 0.95rem; padding: 0.7rem; }
+      .container { width: 95%; padding: 2rem 1.5rem; }
+      h1 { font-size: 1.6rem; }
+      input[type="number"] { font-size: 0.95rem; padding: 0.7rem; }
+      button { font-size: 0.95rem; padding: 0.8rem; }
+      .option-btn { padding: 1.1rem; font-size: 1rem; }
+      .help-btn { top: 1rem; right: 1rem; width: 45px; height: 45px; font-size: 1.3rem; }
+      .modal-content { width: 95%; margin: 5% auto; padding: 1.5rem; max-height: 85vh; }
+      .modal-content h2 { font-size: 1.3rem; }
+      .help-section h3 { font-size: 1rem; }
+    }
+    
+    /* Custom Scrollbar for Modal */
+    .modal-content::-webkit-scrollbar {
+      width: 8px;
+    }
+    .modal-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+    .modal-content::-webkit-scrollbar-thumb {
+      background: #007bff;
+      border-radius: 10px;
+    }
+    .modal-content::-webkit-scrollbar-thumb:hover {
+      background: #0056b3;
     }
   </style>
 </head>
 <body>
+  <!-- Help Button -->
+  <button class="help-btn" onclick="openHelp()" title="Help">?</button>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeHelp()">&times;</button>
+      <h2>📖 How to Use PDF Tools</h2>
+      
+      <div class="help-section">
+        <h3><span class="feature-icon">📄</span> Merge Multiple PDFs</h3>
+        <p><strong>What it does:</strong> Combines multiple PDF files into one single PDF document.</p>
+        <p><strong>How to use:</strong></p>
+        <ul>
+          <li>Click "Merge Multiple PDFs" button</li>
+          <li>Enter how many PDF files you want to merge (2-50)</li>
+          <li>Upload your PDF files in each slot</li>
+          <li>You can upload the same file multiple times if needed</li>
+          <li>Click "Merge PDFs" to combine them</li>
+          <li>Download your merged PDF file</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3><span class="feature-icon">✂️</span> Edit PDF (Remove/Insert Pages)</h3>
+        <p><strong>What it does:</strong> Lets you remove unwanted pages or insert new pages into a PDF.</p>
+        <p><strong>How to use:</strong></p>
+        <ul>
+          <li>Click "Edit PDF (Remove/Insert Pages)" button</li>
+          <li>Upload the PDF file you want to edit</li>
+          <li>View all pages as thumbnails</li>
+          <li>Click <strong>"-" button</strong> to remove a page (click again to undo)</li>
+          <li>Click <strong>"+" button</strong> to insert a new PDF after that page</li>
+          <li>Click "Apply Changes & Download" when done</li>
+          <li>Download your edited PDF file</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3><span class="feature-icon">💡</span> Tips</h3>
+        <ul>
+          <li>All PDF files are processed securely and deleted after use</li>
+          <li>You can merge the same PDF multiple times in different positions</li>
+          <li>When editing, you can insert multiple pages at once</li>
+          <li>Use the back button to navigate between pages</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
   <div class="container">
-    <h1>Merge PDF Files</h1>
-    <form method="POST">
-      <label>How many PDF files do you want to merge?</label>
+    <div id="backBtnContainer" style="display: none; text-align: left;">
+      <a href="/" class="back-btn">← Back</a>
+    </div>
+    
+    <h1>PDF Tools</h1>
+    <p style="color: #666; margin-bottom: 2rem;">Choose what you want to do:</p>
+    
+    <div class="option-buttons">
+      <button onclick="showMergeForm()" class="option-btn">📄 Merge Multiple PDFs</button>
+      <button onclick="location.href='/edit-mode'" class="option-btn edit-btn">✂️ Edit PDF (Remove/Insert Pages)</button>
+    </div>
+
+    <form method="POST" id="mergeForm" style="display: none;">
+      <label style="color: #333; font-weight: 500;">How many PDF files do you want to merge?</label>
       <input type="number" name="num_files" min="2" max="50" required>
-      <button type="submit">Next</button>
+      <button type="submit">Next →</button>
     </form>
   </div>
+
+  <script>
+    function showMergeForm() {
+      document.querySelector('.option-buttons').style.display = 'none';
+      document.querySelector('h1').textContent = 'Merge PDF Files';
+      document.querySelector('p').style.display = 'none';
+      document.getElementById('mergeForm').style.display = 'block';
+      document.getElementById('backBtnContainer').style.display = 'block';
+    }
+
+    function openHelp() {
+      document.getElementById('helpModal').style.display = 'block';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeHelp() {
+      document.getElementById('helpModal').style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      const modal = document.getElementById('helpModal');
+      if (event.target === modal) {
+        closeHelp();
+      }
+    }
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        closeHelp();
+      }
+    });
+  </script>
 </body>
 </html>

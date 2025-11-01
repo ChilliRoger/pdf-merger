@@ -7,45 +7,120 @@
 <style>
   * { box-sizing: border-box; }
   body {
-    font-family: 'Segoe UI', sans-serif;
-    background: linear-gradient(135deg, #e0ecff, #f8faff);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f4f8;
     margin: 0;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
+    padding: 2rem 1rem;
   }
   .container {
     background: #fff;
     padding: 2rem;
-    border-radius: 1rem;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
-    width: 700px;
+    border-radius: 1.5rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    width: 800px;
     max-width: 95%;
-    height: 80vh;
+    max-height: 85vh;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    animation: fadeIn 0.5s ease;
   }
-  h1 { text-align: center; color: #1a1a1a; font-weight: 600; }
-  .scroll-area { overflow-y: auto; flex-grow: 1; margin: 1rem 0; padding-right: 0.5rem; }
-  .scroll-area::-webkit-scrollbar { width: 6px; }
-  .scroll-area::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  h1 { 
+    text-align: center; 
+    color: #1a1a1a; 
+    font-weight: 700;
+    margin-bottom: 1rem;
+    font-size: 2rem;
+  }
+  .scroll-area { 
+    overflow-y: auto; 
+    flex-grow: 1; 
+    margin: 1rem 0; 
+    padding-right: 0.5rem; 
+  }
+  .scroll-area::-webkit-scrollbar { width: 8px; }
+  .scroll-area::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+  .scroll-area::-webkit-scrollbar-thumb { 
+    background: #007bff; 
+    border-radius: 10px; 
+  }
+  .scroll-area::-webkit-scrollbar-thumb:hover { background: #0056b3; }
 
-  .file-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
-  .file-item label { display: block; margin-bottom: 0.3rem; color: #444; font-weight: 500; }
-  input[type="file"] { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 0.5rem; cursor: pointer; }
+  .file-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); 
+    gap: 1.2rem; 
+  }
+  .file-item { 
+    background: #f8f9fa; 
+    padding: 1rem; 
+    border-radius: 0.8rem;
+    border: 2px solid #e0e0e0;
+    transition: all 0.3s;
+  }
+  .file-item:hover {
+    border-color: #007bff;
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+  }
+  .file-item label { 
+    display: block; 
+    margin-bottom: 0.5rem; 
+    color: #333; 
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  input[type="file"] { 
+    width: 100%; 
+    padding: 0.6rem; 
+    border: 2px solid #d0d0d0; 
+    border-radius: 0.6rem; 
+    cursor: pointer;
+    font-size: 0.9rem;
+    background: white;
+    transition: border 0.3s;
+  }
+  input[type="file"]:hover {
+    border-color: #007bff;
+  }
 
   button, .back-button {
-    background-color: #28a745; color: white; border: none;
-    padding: 0.8rem; border-radius: 0.5rem; cursor: pointer; font-size: 1rem;
-    transition: background 0.2s ease; text-align: center;
+    background: #28a745;
+    color: white; 
+    border: none;
+    padding: 0.9rem; 
+    border-radius: 0.7rem; 
+    cursor: pointer; 
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-align: center;
     text-decoration: none;
     display: inline-block;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
   }
-  button:hover { background-color: #1e7e34; }
-  .back-button { background-color: #6c757d; margin-bottom: 0.5rem; }
-  .back-button:hover { background-color: #5a6268; }
+  button:hover { 
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+  }
+  .back-button { 
+    background: #6c757d; 
+    margin-bottom: 1rem;
+    padding: 0.7rem 1.2rem;
+    font-size: 0.95rem;
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+  }
+  .back-button:hover { 
+    background: #5a6268;
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+  }
 
   /* Mobile adjustments */
   @media (max-width: 480px) {
@@ -58,10 +133,8 @@
 </head>
 <body>
 <div class="container">
-  <h1>Upload Your PDFs</h1>
-
-  <!-- Back Button -->
-  <a href="javascript:history.back()" class="back-button">&#8592; Back</a>
+  <a href="/" class="back-button">← Back</a>
+  <h1>📄 Upload Your PDFs</h1>
 
   <form action="/merge" method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; height:100%;">
     <div class="scroll-area">

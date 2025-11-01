@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edit PDF Pages</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f4f8;
+    margin: 0;
+    padding: 2rem 1rem;
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center;
+    background: white;
+    padding: 2rem;
+    border-radius: 1.5rem;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    margin-bottom: 2rem;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    animation: fadeIn 0.5s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  h1 { 
+    color: #1a1a1a; 
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+    font-size: 2rem;
+  }
+  .instructions { 
+    color: #666; 
+    margin: 1rem 0;
+    font-size: 1rem;
+  }
+  .instructions strong:first-of-type {
+    color: #dc3545;
+  }
+  .instructions strong:last-of-type {
+    color: #28a745;
+  }
+  .pages-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto 2rem;
+  }
+  .page-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.2rem;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    position: relative;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+  }
+  .page-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    border-color: #007bff;
+  }
+  .page-number {
+    font-weight: 700;
+    color: #007bff;
+    margin-bottom: 0.7rem;
+    font-size: 1.1rem;
+  }
+  .page-preview {
+    width: 100%;
+    height: 320px;
+    background: #f8f9fa;
+    border: 3px solid #dee2e6;
+    border-radius: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    transition: border 0.3s;
+  }
+  .page-preview:hover {
+    border-color: #007bff;
+  }
+  .page-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .page-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+  }
+  .btn {
+    flex: 1;
+    padding: 0.7rem;
+    border: none;
+    border-radius: 0.6rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.3s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .btn-remove {
+    background: #dc3545;
+    color: white;
+  }
+  .btn-remove:hover { 
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+  }
+  .btn-insert {
+    background: #28a745;
+    color: white;
+  }
+  .btn-insert:hover { 
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+  }
+  .insert-slot {
+    background: #fff3cd;
+    border: 3px dashed #ffc107;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    text-align: center;
+    animation: slideIn 0.3s ease;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .insert-slot input[type="file"] {
+    margin-top: 0.8rem;
+    width: 100%;
+    padding: 0.7rem;
+    border: 2px solid #ffb300;
+    border-radius: 0.6rem;
+    background: white;
+    cursor: pointer;
+    transition: border 0.3s;
+  }
+  .insert-slot input[type="file"]:hover {
+    border-color: #ff8f00;
+  }
+  .cancel-insert {
+    margin-top: 0.8rem;
+    background: #6c757d;
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 0.6rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+  }
+  .cancel-insert:hover { 
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+  }
+  .submit-area {
+    text-align: center;
+    background: white;
+    padding: 1.8rem;
+    border-radius: 1.5rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    max-width: 1200px;
+    margin: 0 auto;
+    position: sticky;
+    bottom: 1rem;
+  }
+  .submit-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 1.2rem 3.5rem;
+    border-radius: 0.8rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+  }
+  .submit-btn:hover { 
+    background: #0056b3;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+  }
+  .back-button {
+    background: #6c757d;
+    color: white;
+    padding: 0.7rem 1.2rem;
+    border-radius: 0.7rem;
+    text-decoration: none;
+    display: inline-block;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    transition: all 0.3s;
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+  }
+  .back-button:hover { 
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+  }
+  .removed { 
+    opacity: 0.5; 
+    position: relative;
+    filter: grayscale(100%);
+  }
+  .removed::after {
+    content: '❌ REMOVED';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #dc3545;
+    color: white;
+    padding: 0.8rem 1.5rem;
+    border-radius: 0.7rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.4);
+  }
+
+  @media (max-width: 768px) {
+    .pages-container { grid-template-columns: 1fr; }
+    .submit-btn { padding: 0.8rem 2rem; font-size: 1rem; }
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <a href="/" class="back-button">← Back to Home</a>
+    <h1>✂️ Edit PDF Pages</h1>
+    <p class="instructions">
+      Use the <strong>- button</strong> to remove a page<br>
+      Use the <strong>+ button</strong> to insert a new page after this one
+    </p>
+  </div>
+
+  <form id="editForm" enctype="multipart/form-data">
+    <input type="hidden" name="session_id" value="{{ session_id }}">
+    <div class="pages-container" id="pagesContainer">
+      {% for page_num in range(1, total_pages + 1) %}
+      <div class="page-card" id="page-{{ page_num }}" data-page="{{ page_num }}">
+        <div class="page-number">Page {{ page_num }}</div>
+        <div class="page-preview">
+          <img src="/page-image/{{ session_id }}/{{ page_num }}" alt="Page {{ page_num }}" loading="lazy">
+        </div>
+        <div class="page-actions">
+          <button type="button" class="btn btn-remove" onclick="removePage({{ page_num }})">
+            - Remove
+          </button>
+          <button type="button" class="btn btn-insert" onclick="showInsertSlot({{ page_num }})">
+            + Insert After
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="submit-area">
+      <button type="button" class="submit-btn" onclick="submitEdit()">Apply Changes & Download</button>
+    </div>
+  </form>
+
+  <script>
+    let removedPages = new Set();
+    let insertions = {};
+
+    function removePage(pageNum) {
+      const pageCard = document.getElementById('page-' + pageNum);
+      if (removedPages.has(pageNum)) {
+        // Undo removal
+        removedPages.delete(pageNum);
+        pageCard.classList.remove('removed');
+      } else {
+        // Mark as removed
+        removedPages.add(pageNum);
+        pageCard.classList.add('removed');
+      }
+    }
+
+    function showInsertSlot(pageNum) {
+      const pageCard = document.getElementById('page-' + pageNum);
+      
+      // Check if insert slot already exists
+      if (pageCard.nextElementSibling && pageCard.nextElementSibling.classList.contains('insert-slot')) {
+        return;
+      }
+
+      const insertSlot = document.createElement('div');
+      insertSlot.className = 'insert-slot';
+      insertSlot.innerHTML = `
+        <div class="page-number">Insert New Page After Page ${pageNum}</div>
+        <input type="file" accept="application/pdf" onchange="handleInsertFile(${pageNum}, this)" multiple>
+        <button type="button" class="cancel-insert" onclick="cancelInsert(this)">Cancel</button>
+      `;
+      
+      pageCard.after(insertSlot);
+    }
+
+    function handleInsertFile(afterPage, input) {
+      if (!insertions[afterPage]) {
+        insertions[afterPage] = [];
+      }
+      insertions[afterPage].push(...input.files);
+    }
+
+    function cancelInsert(button) {
+      const insertSlot = button.parentElement;
+      const pageNum = insertSlot.previousElementSibling.dataset.page;
+      delete insertions[pageNum];
+      insertSlot.remove();
+    }
+
+    async function submitEdit() {
+      const formData = new FormData();
+      formData.append('session_id', '{{ session_id }}');
+      formData.append('removed_pages', JSON.stringify([...removedPages]));
+      
+      // Add insertions
+      for (const [afterPage, files] of Object.entries(insertions)) {
+        for (let i = 0; i < files.length; i++) {
+          formData.append(`insert_after_${afterPage}`, files[i]);
+        }
+      }
+
+      try {
+        const response = await fetch('/apply-edits', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (response.ok) {
+          // Get the HTML response and replace current page
+          const html = await response.text();
+          document.open();
+          document.write(html);
+          document.close();
+        } else {
+          alert('Error editing PDF. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error editing PDF. Please try again.');
+      }
+    }
+  </script>
+</body>
+</html>
