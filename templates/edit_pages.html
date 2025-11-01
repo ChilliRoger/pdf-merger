@@ -248,6 +248,50 @@
   .page-preview img {
     display: block !important;
   }
+  
+  /* Drag and drop styles */
+  .page-card.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+    cursor: grabbing;
+  }
+  .page-card.drag-over {
+    border: 3px solid #007bff;
+    background: #e7f3ff;
+  }
+  .insert-slot.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+    cursor: grabbing;
+  }
+  .insert-slot.drag-over {
+    border-color: #007bff;
+    background: #e7f3ff;
+  }
+  .page-card {
+    cursor: grab;
+  }
+  .page-card:active {
+    cursor: grabbing;
+  }
+  .insert-slot {
+    cursor: grab;
+  }
+  .insert-slot:active {
+    cursor: grabbing;
+  }
+  .drag-handle {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    font-size: 1.5rem;
+    cursor: grab;
+    opacity: 0.6;
+    transition: opacity 0.3s;
+  }
+  .drag-handle:hover {
+    opacity: 1;
+  }
 
   @media (max-width: 768px) {
     .pages-container { grid-template-columns: 1fr; }
@@ -260,6 +304,7 @@
     <a href="/" class="back-button">← Back to Home</a>
     <h1>✂️ Edit PDF Pages</h1>
     <p class="instructions">
+      <strong>Drag and drop</strong> pages to reorder them<br>
       Use the <strong>- button</strong> to remove a page<br>
       Use the <strong>+ button</strong> to insert a new page after this one
     </p>
@@ -269,7 +314,8 @@
     <input type="hidden" name="session_id" value="{{ session_id }}">
     <div class="pages-container" id="pagesContainer">
       {% for page_num in range(1, total_pages + 1) %}
-      <div class="page-card" id="page-{{ page_num }}" data-page="{{ page_num }}">
+      <div class="page-card" id="page-{{ page_num }}" data-page="{{ page_num }}" draggable="true" ondragstart="handleDragStart(event)" ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragend="handleDragEnd(event)" ondragenter="handleDragEnter(event)" ondragleave="handleDragLeave(event)">
+        <div class="drag-handle" title="Drag to reorder">⋮⋮</div>
         <div class="page-number">Page {{ page_num }}</div>
         <div class="page-preview" id="preview-{{ page_num }}">
           <div class="loading-spinner">Loading page {{ page_num }}...</div>
@@ -294,11 +340,16 @@
   <script>
     let removedPages = new Set();
     let insertions = {};
+    let draggedElement = null;
+    let pageOrder = []; // Track the order of pages
     
     // Load page images progressively
     document.addEventListener('DOMContentLoaded', function() {
       const totalPages = {{ total_pages }};
       const sessionId = '{{ session_id }}';
+      
+      // Initialize page order
+      updatePageOrder();
       
       // Load images one by one with delay to avoid overwhelming the server
       function loadPageImage(pageNum) {
@@ -378,7 +429,15 @@
       const insertSlot = document.createElement('div');
       insertSlot.className = 'insert-slot';
       insertSlot.setAttribute('data-insert-after', pageNum);
+      insertSlot.setAttribute('draggable', 'true');
+      insertSlot.setAttribute('ondragstart', 'handleDragStart(event)');
+      insertSlot.setAttribute('ondragover', 'handleDragOver(event)');
+      insertSlot.setAttribute('ondrop', 'handleDrop(event)');
+      insertSlot.setAttribute('ondragend', 'handleDragEnd(event)');
+      insertSlot.setAttribute('ondragenter', 'handleDragEnter(event)');
+      insertSlot.setAttribute('ondragleave', 'handleDragLeave(event)');
       insertSlot.innerHTML = `
+        <div class="drag-handle" title="Drag to reorder">⋮⋮</div>
         <div class="page-number">Insert New Page After Page ${pageNum}</div>
         <input type="file" accept="application/pdf" onchange="handleInsertFile(${pageNum}, this)" multiple>
         <div style="display: flex; gap: 0.5rem; margin-top: 0.8rem; justify-content: center;">
@@ -402,7 +461,15 @@
       newInsertSlot.className = 'insert-slot';
       const newSlotKey = afterPageNum + '_' + Date.now(); // Unique key for nested insertions
       newInsertSlot.setAttribute('data-insert-after', newSlotKey);
+      newInsertSlot.setAttribute('draggable', 'true');
+      newInsertSlot.setAttribute('ondragstart', 'handleDragStart(event)');
+      newInsertSlot.setAttribute('ondragover', 'handleDragOver(event)');
+      newInsertSlot.setAttribute('ondrop', 'handleDrop(event)');
+      newInsertSlot.setAttribute('ondragend', 'handleDragEnd(event)');
+      newInsertSlot.setAttribute('ondragenter', 'handleDragEnter(event)');
+      newInsertSlot.setAttribute('ondragleave', 'handleDragLeave(event)');
       newInsertSlot.innerHTML = `
+        <div class="drag-handle" title="Drag to reorder">⋮⋮</div>
         <div class="page-number">Insert Another Page After This Slot</div>
         <input type="file" accept="application/pdf" onchange="handleInsertFileNested('${newSlotKey}', this)" multiple>
         <div style="display: flex; gap: 0.5rem; margin-top: 0.8rem; justify-content: center;">
@@ -442,10 +509,114 @@
       insertSlot.remove();
     }
 
+    // Drag and Drop Functions
+    function handleDragStart(event) {
+      draggedElement = event.target.closest('.page-card, .insert-slot');
+      if (draggedElement) {
+        draggedElement.classList.add('dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/html', draggedElement.innerHTML);
+      }
+    }
+
+    function handleDragOver(event) {
+      if (event.preventDefault) {
+        event.preventDefault();
+      }
+      event.dataTransfer.dropEffect = 'move';
+      return false;
+    }
+
+    function handleDragEnter(event) {
+      const target = event.target.closest('.page-card, .insert-slot');
+      if (target && target !== draggedElement) {
+        target.classList.add('drag-over');
+      }
+    }
+
+    function handleDragLeave(event) {
+      const target = event.target.closest('.page-card, .insert-slot');
+      if (target) {
+        target.classList.remove('drag-over');
+      }
+    }
+
+    function handleDrop(event) {
+      if (event.stopPropagation) {
+        event.stopPropagation();
+      }
+      event.preventDefault();
+
+      const dropTarget = event.target.closest('.page-card, .insert-slot');
+      
+      if (draggedElement && dropTarget && draggedElement !== dropTarget) {
+        // Get the container
+        const container = document.getElementById('pagesContainer');
+        
+        // Determine if we should insert before or after based on mouse position
+        const dropTargetRect = dropTarget.getBoundingClientRect();
+        const dropTargetMiddle = dropTargetRect.top + dropTargetRect.height / 2;
+        const mouseY = event.clientY;
+        
+        if (mouseY < dropTargetMiddle) {
+          // Insert before
+          container.insertBefore(draggedElement, dropTarget);
+        } else {
+          // Insert after
+          if (dropTarget.nextSibling) {
+            container.insertBefore(draggedElement, dropTarget.nextSibling);
+          } else {
+            container.appendChild(draggedElement);
+          }
+        }
+        
+        // Update page order
+        updatePageOrder();
+      }
+
+      dropTarget.classList.remove('drag-over');
+      return false;
+    }
+
+    function handleDragEnd(event) {
+      if (draggedElement) {
+        draggedElement.classList.remove('dragging');
+      }
+      
+      // Remove drag-over class from all elements
+      document.querySelectorAll('.drag-over').forEach(el => {
+        el.classList.remove('drag-over');
+      });
+      
+      draggedElement = null;
+    }
+
+    function updatePageOrder() {
+      const container = document.getElementById('pagesContainer');
+      pageOrder = [];
+      
+      // Collect all elements in their current order
+      container.querySelectorAll('.page-card, .insert-slot').forEach((element) => {
+        if (element.classList.contains('page-card')) {
+          const pageNum = element.getAttribute('data-page');
+          pageOrder.push({ type: 'page', value: pageNum });
+        } else if (element.classList.contains('insert-slot')) {
+          const insertAfter = element.getAttribute('data-insert-after');
+          pageOrder.push({ type: 'insert', value: insertAfter });
+        }
+      });
+      
+      console.log('Updated page order:', pageOrder);
+    }
+
     async function submitEdit() {
+      // Update page order before submitting
+      updatePageOrder();
+      
       const formData = new FormData();
       formData.append('session_id', '{{ session_id }}');
       formData.append('removed_pages', JSON.stringify([...removedPages]));
+      formData.append('page_order', JSON.stringify(pageOrder));
       
       // Add insertions
       for (const [afterPage, files] of Object.entries(insertions)) {

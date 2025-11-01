@@ -143,42 +143,69 @@ def page_image(session_id, page_num):
 
 @app.route('/apply-edits', methods=['POST'])
 def apply_edits():
-    """Apply page removals and insertions, then show success page"""
+    """Apply page removals, insertions, and reordering, then show success page"""
     try:
         session_id = request.form.get('session_id')
         removed_pages_json = request.form.get('removed_pages', '[]')
         removed_pages = set(json.loads(removed_pages_json))
+        
+        # Get page order if provided
+        page_order_json = request.form.get('page_order', '[]')
+        page_order = json.loads(page_order_json)
         
         # Load original PDF
         pdf_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'original.pdf')
         reader = PdfReader(pdf_path)
         writer = PdfWriter()
         
-        # Collect all insertion keys from the request
-        all_insertion_keys = []
-        for key in request.files.keys():
-            if key.startswith('insert_after_'):
-                all_insertion_keys.append(key)
-        
-        # Process each page
-        for page_num in range(1, len(reader.pages) + 1):
-            # Skip removed pages
-            if page_num not in removed_pages:
-                writer.add_page(reader.pages[page_num - 1])
+        # If page order is provided, use it; otherwise use default sequential order
+        if page_order and len(page_order) > 0:
+            # Process pages in the order specified by drag-and-drop
+            for item in page_order:
+                if item['type'] == 'page':
+                    page_num = int(item['value'])
+                    # Skip removed pages
+                    if page_num not in removed_pages:
+                        writer.add_page(reader.pages[page_num - 1])
+                
+                elif item['type'] == 'insert':
+                    insert_key = f"insert_after_{item['value']}"
+                    if insert_key in request.files:
+                        insert_files = request.files.getlist(insert_key)
+                        for insert_file in insert_files:
+                            if insert_file.filename != '':
+                                # Read the inserted PDF
+                                insert_reader = PdfReader(insert_file.stream)
+                                # Add all pages from inserted PDF
+                                for insert_page in insert_reader.pages:
+                                    writer.add_page(insert_page)
+        else:
+            # Fallback to original logic if no page order provided
+            # Collect all insertion keys from the request
+            all_insertion_keys = []
+            for key in request.files.keys():
+                if key.startswith('insert_after_'):
+                    all_insertion_keys.append(key)
             
-            # Check for insertions after this page (including nested ones)
-            page_insert_keys = [k for k in all_insertion_keys if k.startswith(f'insert_after_{page_num}')]
-            
-            for insert_key in page_insert_keys:
-                if insert_key in request.files:
-                    insert_files = request.files.getlist(insert_key)
-                    for insert_file in insert_files:
-                        if insert_file.filename != '':
-                            # Read the inserted PDF
-                            insert_reader = PdfReader(insert_file.stream)
-                            # Add all pages from inserted PDF
-                            for insert_page in insert_reader.pages:
-                                writer.add_page(insert_page)
+            # Process each page
+            for page_num in range(1, len(reader.pages) + 1):
+                # Skip removed pages
+                if page_num not in removed_pages:
+                    writer.add_page(reader.pages[page_num - 1])
+                
+                # Check for insertions after this page (including nested ones)
+                page_insert_keys = [k for k in all_insertion_keys if k.startswith(f'insert_after_{page_num}')]
+                
+                for insert_key in page_insert_keys:
+                    if insert_key in request.files:
+                        insert_files = request.files.getlist(insert_key)
+                        for insert_file in insert_files:
+                            if insert_file.filename != '':
+                                # Read the inserted PDF
+                                insert_reader = PdfReader(insert_file.stream)
+                                # Add all pages from inserted PDF
+                                for insert_page in insert_reader.pages:
+                                    writer.add_page(insert_page)
         
         # Save edited PDF
         output_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'edited.pdf')
@@ -190,6 +217,8 @@ def apply_edits():
         
     except Exception as e:
         print(f"Error applying edits: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
