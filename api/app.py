@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, send_file, redirect, url_for
 from PyPDF2 import PdfMerger
 import os
+import uuid
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__, template_folder='../templates')
 app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
@@ -23,9 +25,12 @@ def merge_pdfs():
     uploaded_files = request.files.getlist('pdf_files')
 
     file_paths = []
-    for file in uploaded_files:
+    for idx, file in enumerate(uploaded_files):
         if file.filename != '':
-            path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+            # Create unique filename to allow same file in multiple slots
+            original_filename = secure_filename(file.filename)
+            unique_filename = f"{uuid.uuid4().hex}_{idx}_{original_filename}"
+            path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(path)
             file_paths.append(path)
 
