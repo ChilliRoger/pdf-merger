@@ -154,23 +154,31 @@ def apply_edits():
         reader = PdfReader(pdf_path)
         writer = PdfWriter()
         
+        # Collect all insertion keys from the request
+        all_insertion_keys = []
+        for key in request.files.keys():
+            if key.startswith('insert_after_'):
+                all_insertion_keys.append(key)
+        
         # Process each page
         for page_num in range(1, len(reader.pages) + 1):
             # Skip removed pages
             if page_num not in removed_pages:
                 writer.add_page(reader.pages[page_num - 1])
             
-            # Check for insertions after this page
-            insert_key = f'insert_after_{page_num}'
-            if insert_key in request.files:
-                insert_files = request.files.getlist(insert_key)
-                for insert_file in insert_files:
-                    if insert_file.filename != '':
-                        # Read the inserted PDF
-                        insert_reader = PdfReader(insert_file.stream)
-                        # Add all pages from inserted PDF
-                        for insert_page in insert_reader.pages:
-                            writer.add_page(insert_page)
+            # Check for insertions after this page (including nested ones)
+            page_insert_keys = [k for k in all_insertion_keys if k.startswith(f'insert_after_{page_num}')]
+            
+            for insert_key in page_insert_keys:
+                if insert_key in request.files:
+                    insert_files = request.files.getlist(insert_key)
+                    for insert_file in insert_files:
+                        if insert_file.filename != '':
+                            # Read the inserted PDF
+                            insert_reader = PdfReader(insert_file.stream)
+                            # Add all pages from inserted PDF
+                            for insert_page in insert_reader.pages:
+                                writer.add_page(insert_page)
         
         # Save edited PDF
         output_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'edited.pdf')

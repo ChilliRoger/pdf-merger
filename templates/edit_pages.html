@@ -377,13 +377,41 @@
 
       const insertSlot = document.createElement('div');
       insertSlot.className = 'insert-slot';
+      insertSlot.setAttribute('data-insert-after', pageNum);
       insertSlot.innerHTML = `
         <div class="page-number">Insert New Page After Page ${pageNum}</div>
         <input type="file" accept="application/pdf" onchange="handleInsertFile(${pageNum}, this)" multiple>
-        <button type="button" class="cancel-insert" onclick="cancelInsert(this)">Cancel</button>
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.8rem; justify-content: center;">
+          <button type="button" class="cancel-insert" onclick="cancelInsert(this)">Cancel</button>
+          <button type="button" class="btn btn-insert" style="flex: unset; padding: 0.6rem 1.2rem;" onclick="showInsertSlotAfter(this, ${pageNum})">+ Insert After This</button>
+        </div>
       `;
       
       pageCard.after(insertSlot);
+    }
+    
+    function showInsertSlotAfter(button, afterPageNum) {
+      const currentSlot = button.closest('.insert-slot');
+      
+      // Check if insert slot already exists after this slot
+      if (currentSlot.nextElementSibling && currentSlot.nextElementSibling.classList.contains('insert-slot')) {
+        return;
+      }
+
+      const newInsertSlot = document.createElement('div');
+      newInsertSlot.className = 'insert-slot';
+      const newSlotKey = afterPageNum + '_' + Date.now(); // Unique key for nested insertions
+      newInsertSlot.setAttribute('data-insert-after', newSlotKey);
+      newInsertSlot.innerHTML = `
+        <div class="page-number">Insert Another Page After This Slot</div>
+        <input type="file" accept="application/pdf" onchange="handleInsertFileNested('${newSlotKey}', this)" multiple>
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.8rem; justify-content: center;">
+          <button type="button" class="cancel-insert" onclick="cancelInsertNested(this)">Cancel</button>
+          <button type="button" class="btn btn-insert" style="flex: unset; padding: 0.6rem 1.2rem;" onclick="showInsertSlotAfter(this, ${afterPageNum})">+ Insert After This</button>
+        </div>
+      `;
+      
+      currentSlot.after(newInsertSlot);
     }
 
     function handleInsertFile(afterPage, input) {
@@ -392,11 +420,25 @@
       }
       insertions[afterPage].push(...input.files);
     }
+    
+    function handleInsertFileNested(slotKey, input) {
+      if (!insertions[slotKey]) {
+        insertions[slotKey] = [];
+      }
+      insertions[slotKey].push(...input.files);
+    }
 
     function cancelInsert(button) {
-      const insertSlot = button.parentElement;
-      const pageNum = insertSlot.previousElementSibling.dataset.page;
+      const insertSlot = button.closest('.insert-slot');
+      const pageNum = insertSlot.getAttribute('data-insert-after');
       delete insertions[pageNum];
+      insertSlot.remove();
+    }
+    
+    function cancelInsertNested(button) {
+      const insertSlot = button.closest('.insert-slot');
+      const slotKey = insertSlot.getAttribute('data-insert-after');
+      delete insertions[slotKey];
       insertSlot.remove();
     }
 
