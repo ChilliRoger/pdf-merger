@@ -270,6 +270,6 @@ If you encounter any issues or have questions:
 
 **Live Demo**: [https://pdf-merger-eta-rust.vercel.app/](https://pdf-merger-eta-rust.vercel.app/)
 
-Made with ❤️ using Flask and Python
+
 
 
