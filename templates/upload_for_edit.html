@@ -198,21 +198,60 @@
 </div>
 
 <script>
+  // Chunked upload for Vercel free plan
+  const CHUNK_SIZE = 3.5 * 1024 * 1024; // 3.5MB chunks
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB max
+  
   function validateFileSize(input) {
     const file = input.files[0];
-    const maxSize = 50 * 1024 * 1024; // 50MB - Vercel compatible limit
     const infoDiv = document.getElementById('fileSizeInfo');
     
     if (file) {
       const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
       infoDiv.textContent = `File size: ${sizeMB} MB`;
       
-      if (file.size > maxSize) {
+      if (file.size > MAX_FILE_SIZE) {
         infoDiv.classList.add('file-size-warning');
         infoDiv.textContent = `⚠️ File too large! Max 50MB (${sizeMB} MB)`;
-        input.value = ''; // Clear the invalid file
+        input.value = '';
       } else {
         infoDiv.classList.remove('file-size-warning');
+      }
+    }
+  }
+  
+  async function uploadFileInChunks(file, fileId, progressCallback) {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    
+    for (let chunkNumber = 0; chunkNumber < totalChunks; chunkNumber++) {
+      const start = chunkNumber * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
+      
+      const formData = new FormData();
+      formData.append('chunk', chunk);
+      formData.append('chunkNumber', chunkNumber);
+      formData.append('totalChunks', totalChunks);
+      formData.append('fileId', fileId);
+      formData.append('filename', file.name);
+      
+      const response = await fetch('/upload-chunk', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Chunk upload failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      // Update progress
+      const progress = ((chunkNumber + 1) / totalChunks) * 100;
+      progressCallback(progress);
+      
+      if (result.complete) {
+        return result.filePath;
       }
     }
   }
@@ -220,37 +259,48 @@
   document.getElementById('uploadForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const formData = new FormData(this);
+    const fileInput = this.querySelector('input[type="file"]');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+      alert('Please select a PDF file');
+      return;
+    }
+    
     const progressContainer = document.getElementById('progressContainer');
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
     
     // Show progress
     progressContainer.classList.add('active');
-    progressBar.style.width = '10%';
-    progressBar.textContent = '10%';
-    progressText.textContent = 'Uploading PDF file...';
+    progressBar.style.width = '0%';
+    progressBar.textContent = '0%';
+    progressText.textContent = 'Uploading PDF in chunks...';
     
     try {
-      // Simulate upload progress
-      let progress = 10;
-      const progressInterval = setInterval(() => {
-        if (progress < 80) {
-          progress += 5;
-          progressBar.style.width = progress + '%';
-          progressBar.textContent = progress + '%';
-          if (progress > 50) {
-            progressText.textContent = 'Processing PDF pages...';
-          }
-        }
-      }, 150);
+      const fileId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      const response = await fetch('/process-upload-for-edit', {
-        method: 'POST',
-        body: formData
+      // Upload file in chunks
+      const filePath = await uploadFileInChunks(file, fileId, (chunkProgress) => {
+        const progress = chunkProgress * 0.7; // 0-70% for upload
+        progressBar.style.width = progress + '%';
+        progressBar.textContent = Math.round(progress) + '%';
       });
       
-      clearInterval(progressInterval);
+      // Now process the uploaded file
+      progressBar.style.width = '70%';
+      progressBar.textContent = '70%';
+      progressText.textContent = 'Processing PDF pages...';
+      
+      // Move uploaded file to edit session
+      const processFormData = new FormData();
+      processFormData.append('fileId', fileId);
+      processFormData.append('filename', file.name);
+      
+      const response = await fetch('/process-chunked-edit', {
+        method: 'POST',
+        body: processFormData
+      });
       
       if (response.ok) {
         const result = await response.json();
@@ -274,7 +324,7 @@
     } catch (error) {
       console.error('Error:', error);
       progressContainer.classList.remove('active');
-      alert('Error: ' + error.message);
+      alert('Error: ' + error.message + '\n\nTip: Try with a smaller file.');
     }
   });
 </script>

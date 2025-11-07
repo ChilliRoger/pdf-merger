@@ -12,13 +12,14 @@ import warnings
 # Suppress PyPDF2 warnings about malformed PDFs
 warnings.filterwarnings("ignore", category=UserWarning, module="PyPDF2")
 
-app = Flask(__name__, template_folder='../templates')
+app = Flask(__name__, template_folder='../templates', static_folder='../static')
 app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
 app.config['MERGED_FOLDER'] = '/tmp/merged'
 app.config['EDIT_FOLDER'] = '/tmp/edit_sessions'
-# Note: Vercel has limits - Free: 4.5MB, Pro: 100MB
-# Local development can handle up to 500MB
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB for Vercel Pro compatibility
+# Vercel Free (Hobby) plan: 4.5MB limit
+# Using chunked upload approach to handle larger files
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB for chunked uploads
+app.config['CHUNK_SIZE'] = 4 * 1024 * 1024  # 4MB chunks (under 4.5MB limit)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -141,6 +142,117 @@ def merge_result():
     return render_template('result.html', filename=filename)
 
 
+# CHUNKED UPLOAD ROUTES (for large files on free plan)
+
+@app.route('/upload-chunk', methods=['POST'])
+def upload_chunk():
+    """Handle chunked file uploads to bypass 4.5MB limit"""
+    try:
+        chunk = request.files.get('chunk')
+        chunk_number = int(request.form.get('chunkNumber'))
+        total_chunks = int(request.form.get('totalChunks'))
+        file_id = request.form.get('fileId')
+        original_filename = request.form.get('filename')
+        
+        if not all([chunk, file_id, original_filename]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        # Create temp directory for chunks
+        chunk_dir = os.path.join(app.config['UPLOAD_FOLDER'], file_id)
+        os.makedirs(chunk_dir, exist_ok=True)
+        
+        # Save chunk
+        chunk_path = os.path.join(chunk_dir, f'chunk_{chunk_number}')
+        chunk.save(chunk_path)
+        
+        # If all chunks received, combine them
+        if chunk_number == total_chunks - 1:
+            final_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}_{secure_filename(original_filename)}")
+            
+            with open(final_path, 'wb') as final_file:
+                for i in range(total_chunks):
+                    chunk_path = os.path.join(chunk_dir, f'chunk_{i}')
+                    with open(chunk_path, 'rb') as chunk_file:
+                        final_file.write(chunk_file.read())
+                    os.remove(chunk_path)
+            
+            # Remove chunk directory
+            os.rmdir(chunk_dir)
+            
+            return jsonify({
+                'success': True,
+                'complete': True,
+                'filePath': final_path,
+                'fileId': file_id
+            })
+        
+        return jsonify({
+            'success': True,
+            'complete': False,
+            'chunkNumber': chunk_number
+        })
+        
+    except Exception as e:
+        print(f"Error in upload_chunk: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/merge-chunked', methods=['POST'])
+def merge_chunked():
+    """Merge PDFs that were uploaded in chunks"""
+    try:
+        file_ids = request.form.getlist('fileIds[]')
+        
+        if not file_ids or len(file_ids) == 0:
+            return jsonify({'error': 'No files provided'}), 400
+        
+        merger = PdfMerger()
+        file_paths = []
+        
+        # Find uploaded files by ID
+        for file_id in file_ids:
+            # Find file in upload folder
+            for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+                if filename.startswith(file_id + '_'):
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file_paths.append(file_path)
+                    break
+        
+        if len(file_paths) == 0:
+            return jsonify({'error': 'No uploaded files found'}), 404
+        
+        # Merge PDFs
+        for path in file_paths:
+            try:
+                merger.append(path)
+            except Exception as e:
+                # Clean up on error
+                for p in file_paths:
+                    if os.path.exists(p):
+                        os.remove(p)
+                return jsonify({'error': f'Error merging PDF: {str(e)}'}), 500
+        
+        output_filename = f"merged_{uuid.uuid4().hex}.pdf"
+        output_path = os.path.join(app.config['MERGED_FOLDER'], output_filename)
+        merger.write(output_path)
+        merger.close()
+        
+        # Clean uploaded files
+        for path in file_paths:
+            if os.path.exists(path):
+                os.remove(path)
+        
+        return jsonify({'success': True, 'filename': output_filename})
+    
+    except Exception as e:
+        print(f"Error in merge_chunked: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+
+
 # PDF EDITING ROUTES
 
 @app.route('/edit-mode', methods=['GET'])
@@ -161,6 +273,56 @@ def edit_pages():
     return render_template('edit_pages.html', 
                           session_id=session_id, 
                           total_pages=total_pages)
+
+
+@app.route('/process-chunked-edit', methods=['POST'])
+def process_chunked_edit():
+    """Process a file uploaded in chunks for editing"""
+    try:
+        file_id = request.form.get('fileId')
+        filename = request.form.get('filename')
+        
+        if not file_id or not filename:
+            return jsonify({'error': 'Missing file information'}), 400
+        
+        # Find the uploaded file
+        uploaded_file = None
+        for fname in os.listdir(app.config['UPLOAD_FOLDER']):
+            if fname.startswith(file_id + '_'):
+                uploaded_file = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+                break
+        
+        if not uploaded_file or not os.path.exists(uploaded_file):
+            return jsonify({'error': 'Uploaded file not found'}), 404
+        
+        # Create session for editing
+        session_id = uuid.uuid4().hex
+        session_dir = os.path.join(app.config['EDIT_FOLDER'], session_id)
+        os.makedirs(session_dir, exist_ok=True)
+        
+        # Move file to session directory
+        session_pdf_path = os.path.join(session_dir, 'original.pdf')
+        
+        # Copy instead of move to handle cross-device issues
+        import shutil
+        shutil.copy2(uploaded_file, session_pdf_path)
+        os.remove(uploaded_file)
+        
+        # Get total pages
+        reader = PdfReader(session_pdf_path)
+        total_pages = len(reader.pages)
+        
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'total_pages': total_pages
+        })
+        
+    except Exception as e:
+        print(f"Error in process_chunked_edit: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
 
 @app.route('/process-upload-for-edit', methods=['POST'])
