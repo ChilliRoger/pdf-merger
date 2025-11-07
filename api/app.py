@@ -7,6 +7,10 @@ import io
 from PIL import Image
 import fitz  # PyMuPDF
 import json
+import warnings
+
+# Suppress PyPDF2 warnings about malformed PDFs
+warnings.filterwarnings("ignore", category=UserWarning, module="PyPDF2")
 
 app = Flask(__name__, template_folder='../templates')
 app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
