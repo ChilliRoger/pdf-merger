@@ -12,6 +12,10 @@ app = Flask(__name__, template_folder='../templates')
 app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
 app.config['MERGED_FOLDER'] = '/tmp/merged'
 app.config['EDIT_FOLDER'] = '/tmp/edit_sessions'
+# Note: Vercel has limits - Free: 4.5MB, Pro: 100MB
+# Local development can handle up to 500MB
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB for Vercel Pro compatibility
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['MERGED_FOLDER'], exist_ok=True)
@@ -27,42 +31,110 @@ def index():
 
 @app.route('/merge', methods=['POST'])
 def merge_pdfs():
-    merger = PdfMerger()
-    uploaded_files = request.files.getlist('pdf_files')
+    try:
+        merger = PdfMerger()
+        uploaded_files = request.files.getlist('pdf_files')
 
-    file_paths = []
-    for idx, file in enumerate(uploaded_files):
-        if file.filename != '':
-            # Create unique filename to allow same file in multiple slots
-            original_filename = secure_filename(file.filename)
-            unique_filename = f"{uuid.uuid4().hex}_{idx}_{original_filename}"
-            path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            file.save(path)
-            file_paths.append(path)
+        if not uploaded_files or len(uploaded_files) == 0:
+            return jsonify({'error': 'No files uploaded'}), 400
 
-    for path in file_paths:
-        merger.append(path)
+        file_paths = []
+        total_size = 0
+        
+        # Adjusted for Vercel limits (50MB per file for safety)
+        MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB per file
+        
+        for idx, file in enumerate(uploaded_files):
+            if file.filename != '':
+                # Validate file size (individual file should not exceed 100MB)
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)
+                
+                if file_size > MAX_FILE_SIZE:
+                    return jsonify({'error': f'File {file.filename} exceeds {MAX_FILE_SIZE/(1024*1024)}MB limit'}), 400
+                
+                total_size += file_size
+                
+                # Create unique filename to allow same file in multiple slots
+                original_filename = secure_filename(file.filename)
+                unique_filename = f"{uuid.uuid4().hex}_{idx}_{original_filename}"
+                path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                
+                # Save in chunks for large files
+                with open(path, 'wb') as f:
+                    while True:
+                        chunk = file.read(8192)  # 8KB chunks
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                
+                file_paths.append(path)
 
-    output_path = os.path.join(app.config['MERGED_FOLDER'], 'merged.pdf')
-    merger.write(output_path)
-    merger.close()
+        # Merge PDFs with better memory management
+        for path in file_paths:
+            try:
+                merger.append(path)
+            except Exception as e:
+                # Clean up on error
+                for p in file_paths:
+                    if os.path.exists(p):
+                        os.remove(p)
+                return jsonify({'error': f'Error merging PDF: {str(e)}'}), 500
 
-    # Clean uploaded files
-    for path in file_paths:
-        os.remove(path)
+        output_filename = f"merged_{uuid.uuid4().hex}.pdf"
+        output_path = os.path.join(app.config['MERGED_FOLDER'], output_filename)
+        merger.write(output_path)
+        merger.close()
 
-    return render_template('result.html')
+        # Clean uploaded files
+        for path in file_paths:
+            if os.path.exists(path):
+                os.remove(path)
+
+        return jsonify({'success': True, 'filename': output_filename})
+    
+    except Exception as e:
+        print(f"Error in merge_pdfs: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
 
-@app.route('/download', methods=['GET'])
-def download():
-    output_path = os.path.join(app.config['MERGED_FOLDER'], 'merged.pdf')
-    return send_file(output_path, as_attachment=True)
+@app.route('/download/<filename>', methods=['GET'])
+def download(filename):
+    try:
+        # Sanitize filename to prevent directory traversal
+        safe_filename = secure_filename(filename)
+        output_path = os.path.join(app.config['MERGED_FOLDER'], safe_filename)
+        
+        if not os.path.exists(output_path):
+            return "File not found", 404
+        
+        response = send_file(output_path, as_attachment=True, download_name='merged.pdf')
+        
+        # Clean up after download
+        try:
+            os.remove(output_path)
+        except:
+            pass
+            
+        return response
+    except Exception as e:
+        print(f"Error in download: {e}")
+        return "Error downloading file", 500
 
 
 @app.route('/restart', methods=['GET'])
 def restart():
     return redirect(url_for('index'))
+
+
+@app.route('/merge-result', methods=['GET'])
+def merge_result():
+    """Show merge success page"""
+    filename = request.args.get('filename', 'merged.pdf')
+    return render_template('result.html', filename=filename)
 
 
 # PDF EDITING ROUTES
@@ -73,37 +145,77 @@ def edit_mode():
     return render_template('upload_for_edit.html')
 
 
-@app.route('/process-upload-for-edit', methods=['POST'])
-def process_upload_for_edit():
-    """Process uploaded PDF and show page editor"""
-    pdf_file = request.files.get('pdf_file')
+@app.route('/edit-pages', methods=['GET'])
+def edit_pages():
+    """Show the page editor"""
+    session_id = request.args.get('session_id')
+    total_pages = request.args.get('total_pages', 0, type=int)
     
-    if not pdf_file or pdf_file.filename == '':
+    if not session_id or total_pages == 0:
         return redirect(url_for('edit_mode'))
-    
-    # Create unique session ID
-    session_id = uuid.uuid4().hex
-    session_dir = os.path.join(app.config['EDIT_FOLDER'], session_id)
-    os.makedirs(session_dir, exist_ok=True)
-    
-    # Save uploaded PDF
-    pdf_path = os.path.join(session_dir, 'original.pdf')
-    pdf_file.save(pdf_path)
-    
-    # Get total pages
-    reader = PdfReader(pdf_path)
-    total_pages = len(reader.pages)
     
     return render_template('edit_pages.html', 
                           session_id=session_id, 
                           total_pages=total_pages)
 
 
+@app.route('/process-upload-for-edit', methods=['POST'])
+def process_upload_for_edit():
+    """Process uploaded PDF and show page editor"""
+    try:
+        pdf_file = request.files.get('pdf_file')
+        
+        if not pdf_file or pdf_file.filename == '':
+            return jsonify({'error': 'No file uploaded'}), 400
+        
+        # Check file size
+        pdf_file.seek(0, os.SEEK_END)
+        file_size = pdf_file.tell()
+        pdf_file.seek(0)
+        
+        MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB for Vercel compatibility
+        
+        if file_size > MAX_FILE_SIZE:
+            return jsonify({'error': f'File size exceeds {MAX_FILE_SIZE/(1024*1024)}MB limit'}), 400
+        
+        # Create unique session ID
+        session_id = uuid.uuid4().hex
+        session_dir = os.path.join(app.config['EDIT_FOLDER'], session_id)
+        os.makedirs(session_dir, exist_ok=True)
+        
+        # Save uploaded PDF in chunks for large files
+        pdf_path = os.path.join(session_dir, 'original.pdf')
+        with open(pdf_path, 'wb') as f:
+            while True:
+                chunk = pdf_file.read(8192)  # 8KB chunks
+                if not chunk:
+                    break
+                f.write(chunk)
+        
+        # Get total pages
+        reader = PdfReader(pdf_path)
+        total_pages = len(reader.pages)
+        
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'total_pages': total_pages
+        })
+        
+    except Exception as e:
+        print(f"Error in process_upload_for_edit: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+
+
 @app.route('/page-image/<session_id>/<int:page_num>', methods=['GET'])
 def page_image(session_id, page_num):
     """Generate and serve page preview image"""
     try:
-        pdf_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'original.pdf')
+        # Sanitize session_id to prevent directory traversal
+        safe_session_id = secure_filename(session_id)
+        pdf_path = os.path.join(app.config['EDIT_FOLDER'], safe_session_id, 'original.pdf')
         
         # Check if file exists
         if not os.path.exists(pdf_path):
@@ -119,12 +231,12 @@ def page_image(session_id, page_num):
         
         page = doc[page_num - 1]  # PyMuPDF uses 0-based indexing
         
-        # Render page to image with lower quality for faster loading
-        # Reduced from 1.5 to 1.0 for faster generation and smaller file size
-        pix = page.get_pixmap(matrix=fitz.Matrix(1.0, 1.0), alpha=False)
+        # Render page to image with optimized settings for large files
+        # Use lower resolution for faster generation
+        pix = page.get_pixmap(matrix=fitz.Matrix(0.8, 0.8), alpha=False)
         
-        # Convert to JPEG for smaller file size (faster loading)
-        img_data = pix.tobytes("jpeg", jpg_quality=75)
+        # Convert to JPEG with lower quality for faster loading and smaller size
+        img_data = pix.tobytes("jpeg", jpg_quality=60)
         
         doc.close()
         
@@ -146,6 +258,12 @@ def apply_edits():
     """Apply page removals, insertions, and reordering, then show success page"""
     try:
         session_id = request.form.get('session_id')
+        if not session_id:
+            return jsonify({'error': 'No session ID provided'}), 400
+            
+        # Sanitize session_id
+        safe_session_id = secure_filename(session_id)
+        
         removed_pages_json = request.form.get('removed_pages', '[]')
         removed_pages = set(json.loads(removed_pages_json))
         
@@ -154,7 +272,11 @@ def apply_edits():
         page_order = json.loads(page_order_json)
         
         # Load original PDF
-        pdf_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'original.pdf')
+        pdf_path = os.path.join(app.config['EDIT_FOLDER'], safe_session_id, 'original.pdf')
+        
+        if not os.path.exists(pdf_path):
+            return jsonify({'error': 'Session not found'}), 404
+            
         reader = PdfReader(pdf_path)
         writer = PdfWriter()
         
@@ -208,12 +330,15 @@ def apply_edits():
                                     writer.add_page(insert_page)
         
         # Save edited PDF
-        output_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'edited.pdf')
+        output_path = os.path.join(app.config['EDIT_FOLDER'], safe_session_id, 'edited.pdf')
         with open(output_path, 'wb') as output_file:
             writer.write(output_file)
         
-        # Return success page instead of direct download
-        return render_template('edit_success.html', session_id=session_id)
+        # Return success response
+        return jsonify({
+            'success': True,
+            'session_id': safe_session_id
+        })
         
     except Exception as e:
         print(f"Error applying edits: {e}")
@@ -226,11 +351,37 @@ def apply_edits():
 def download_edited(session_id):
     """Download the edited PDF"""
     try:
-        output_path = os.path.join(app.config['EDIT_FOLDER'], session_id, 'edited.pdf')
-        return send_file(output_path, as_attachment=True, download_name='edited.pdf')
+        # Sanitize session_id
+        safe_session_id = secure_filename(session_id)
+        output_path = os.path.join(app.config['EDIT_FOLDER'], safe_session_id, 'edited.pdf')
+        
+        if not os.path.exists(output_path):
+            return "File not found", 404
+        
+        response = send_file(output_path, as_attachment=True, download_name='edited.pdf')
+        
+        # Clean up session after download
+        try:
+            session_dir = os.path.join(app.config['EDIT_FOLDER'], safe_session_id)
+            if os.path.exists(session_dir):
+                import shutil
+                shutil.rmtree(session_dir)
+        except Exception as cleanup_error:
+            print(f"Error cleaning up session: {cleanup_error}")
+        
+        return response
     except Exception as e:
         print(f"Error downloading edited PDF: {e}")
         return "Error downloading file", 500
+
+
+@app.route('/edit-success', methods=['GET'])
+def edit_success():
+    """Show edit success page"""
+    session_id = request.args.get('session_id')
+    if not session_id:
+        return redirect(url_for('edit_mode'))
+    return render_template('edit_success.html', session_id=session_id)
 
 
 if __name__ == '__main__':

@@ -249,6 +249,56 @@
     display: block !important;
   }
   
+  /* Progress Overlay */
+  .progress-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  }
+  .progress-overlay.active {
+    display: flex;
+  }
+  .progress-box {
+    background: white;
+    padding: 2rem;
+    border-radius: 1rem;
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+  }
+  .progress-bar-container {
+    width: 100%;
+    height: 30px;
+    background: #e0e0e0;
+    border-radius: 15px;
+    overflow: hidden;
+    margin: 1rem 0;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #20c997);
+    width: 0%;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.9rem;
+  }
+  .progress-text {
+    color: #333;
+    font-weight: 600;
+    margin-top: 1rem;
+  }
+  
   /* Drag and drop styles */
   .page-card.dragging {
     opacity: 0.5;
@@ -300,6 +350,17 @@
 </style>
 </head>
 <body>
+  <!-- Progress Overlay -->
+  <div class="progress-overlay" id="progressOverlay">
+    <div class="progress-box">
+      <h2 style="color: #007bff; margin-bottom: 1rem;">Processing Changes...</h2>
+      <div class="progress-bar-container">
+        <div class="progress-bar" id="progressBar">0%</div>
+      </div>
+      <div class="progress-text" id="progressText">Applying edits...</div>
+    </div>
+  </div>
+
   <div class="header">
     <a href="/" class="back-button">← Back to Home</a>
     <h1>✂️ Edit PDF Pages</h1>
@@ -352,6 +413,9 @@
       updatePageOrder();
       
       // Load images one by one with delay to avoid overwhelming the server
+      // Increased delay for large files
+      const delay = totalPages > 50 ? 250 : 200;
+      
       function loadPageImage(pageNum) {
         const preview = document.getElementById('preview-' + pageNum);
         const img = document.createElement('img');
@@ -372,9 +436,9 @@
         img.style.objectFit = 'contain';
       }
       
-      // Load pages with a small delay between each
+      // Load pages with a delay between each (longer for large files)
       for (let i = 1; i <= totalPages; i++) {
-        setTimeout(() => loadPageImage(i), (i - 1) * 150);
+        setTimeout(() => loadPageImage(i), (i - 1) * delay);
       }
     });
     
@@ -625,24 +689,60 @@
         }
       }
 
+      // Show progress overlay
+      const progressOverlay = document.getElementById('progressOverlay');
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      
+      progressOverlay.classList.add('active');
+      progressBar.style.width = '10%';
+      progressBar.textContent = '10%';
+      progressText.textContent = 'Uploading changes...';
+
       try {
+        // Simulate progress
+        let progress = 10;
+        const progressInterval = setInterval(() => {
+          if (progress < 80) {
+            progress += 5;
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = progress + '%';
+            if (progress > 40) {
+              progressText.textContent = 'Applying edits to PDF...';
+            }
+          }
+        }, 200);
+        
         const response = await fetch('/apply-edits', {
           method: 'POST',
           body: formData
         });
 
+        clearInterval(progressInterval);
+
         if (response.ok) {
-          // Get the HTML response and replace current page
-          const html = await response.text();
-          document.open();
-          document.write(html);
-          document.close();
+          const result = await response.json();
+          
+          if (result.success) {
+            progressBar.style.width = '100%';
+            progressBar.textContent = '100%';
+            progressText.textContent = 'PDF edited successfully!';
+            
+            // Redirect to success page
+            setTimeout(() => {
+              window.location.href = '/edit-success?session_id=' + encodeURIComponent(result.session_id);
+            }, 500);
+          } else {
+            throw new Error(result.error || 'Unknown error occurred');
+          }
         } else {
-          alert('Error editing PDF. Please try again.');
+          const error = await response.json();
+          throw new Error(error.error || 'Server error occurred');
         }
       } catch (error) {
         console.error('Error:', error);
-        alert('Error editing PDF. Please try again.');
+        progressOverlay.classList.remove('active');
+        alert('Error editing PDF: ' + error.message + '\nPlease try again.');
       }
     }
   </script>

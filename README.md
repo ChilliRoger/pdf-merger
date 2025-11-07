@@ -6,16 +6,22 @@ A powerful web application built with Flask that allows users to merge multiple 
 
 ### 📄 PDF Merger
 - **Multiple PDF Upload**: Upload and merge 2-50 PDF files at once
+- **Large File Support**: Handle PDFs up to 100MB per file (500MB total)
 - **Duplicate File Support**: Upload the same PDF file multiple times in different positions
 - **Flexible Ordering**: Files are merged in the order they are uploaded
+- **Progress Indicators**: Real-time upload and merge progress tracking
+- **Chunked Upload**: Optimized handling for large files
 - **Download Merged PDF**: Get your combined PDF instantly
 
 ### ✂️ PDF Editor (Remove/Insert Pages)
 - **Page Preview**: View all pages as thumbnails before editing
+- **Large PDF Support**: Edit PDFs up to 100MB with optimized loading
 - **Remove Pages**: Click the "- Remove" button to delete unwanted pages
 - **Insert Pages**: Click the "+ Insert After" button to add new PDF pages at any position
+- **Drag & Drop Reordering**: Rearrange pages by dragging them
 - **Multiple Insertions**: Insert multiple PDF files at different positions
 - **Visual Feedback**: See which pages are marked for removal in real-time
+- **Progress Tracking**: Visual progress for uploads and edits
 - **Download Edited PDF**: Get your modified PDF with all changes applied
 
 ### 🎨 User Interface
@@ -23,7 +29,10 @@ A powerful web application built with Flask that allows users to merge multiple 
 - **Responsive Layout**: Works perfectly on desktop, tablet, and mobile devices
 - **Help System**: Built-in help button (?) with detailed usage instructions
 - **Easy Navigation**: Back buttons on every page for seamless navigation
+- **Progress Bars**: Real-time visual feedback for all operations
+- **File Size Validation**: Automatic checking of file sizes before upload
 - **Success Pages**: Clear confirmation pages after operations complete
+- **Error Handling**: User-friendly error messages with helpful guidance
 
 
 ## 📁 Project Structure
@@ -191,22 +200,29 @@ To deploy on Vercel:
 - **Editing**: Session-based storage in `/tmp/edit_sessions` with unique session IDs
 - **Auto Cleanup**: All uploaded files are automatically deleted after processing
 - **Unique Filenames**: UUID-based naming prevents conflicts when uploading duplicate files
+- **Chunked Processing**: Large files processed in 8KB chunks for memory efficiency
+- **Session Cleanup**: Edit sessions automatically cleaned up after download
 
 ### PDF Processing
 
 - **Merging**: Uses PyPDF2's `PdfMerger` and `PdfWriter` for efficient combining
 - **Page Extraction**: PyPDF2's `PdfReader` for page-level manipulation
 - **Image Rendering**: PyMuPDF (fitz) renders PDF pages as JPEG thumbnails
-- **Optimization**: 1.0x zoom and 75% JPEG quality for fast loading in serverless environments
+- **Optimization**: 0.8x zoom and 60% JPEG quality for fast loading of large PDFs
+- **Large File Handling**: Optimized processing for PDFs up to 100MB
+- **Progressive Loading**: Adaptive delay based on PDF size (200-250ms per page)
 
 ### Security & Performance
 
-- **File Validation**: Only PDF files accepted (`accept="application/pdf"`)
-- **Session Isolation**: Each editing session has a unique ID
-- **No Persistent Storage**: Files deleted immediately after use
+- **File Validation**: Only PDF files accepted with size limits (100MB per file, 500MB total)
+- **Size Checking**: Pre-upload validation prevents oversized files
+- **Session Isolation**: Each editing session has a unique ID with sanitized filenames
+- **Directory Traversal Protection**: All filenames sanitized using `secure_filename()`
+- **No Persistent Storage**: Files deleted immediately after download
 - **Progressive Loading**: Page images load sequentially to avoid server overload
-- **Error Recovery**: Retry mechanism for failed page loads
-- **Serverless Ready**: Optimized for Vercel's serverless functions
+- **Error Recovery**: Retry mechanism for failed page loads with user-friendly messages
+- **Serverless Ready**: Optimized for Vercel's serverless functions with 500MB limit
+- **Memory Management**: Chunked file reading/writing for large files
 
 ### Browser Features
 
@@ -220,12 +236,13 @@ To deploy on Vercel:
 ## ⚠️ Limitations
 
 - **File Count**: Maximum 50 PDFs can be merged at once
-- **File Size**: Limited by server/hosting configuration (Vercel has 50MB limit)
+- **File Size**: 100MB per individual file, 500MB total for merging
 - **Processing Time**: Large PDFs may take longer to process in serverless environments
-- **Page Previews**: Generated on-demand, may take time for PDFs with many pages
+- **Page Previews**: Generated on-demand with progressive loading for better performance
 - **No Password Support**: Cannot process password-protected PDFs
 - **Temporary Storage**: Files are not permanently stored, download immediately
 - **No Encryption**: Edited/merged PDFs are not encrypted
+- **Serverless Timeout**: Very large operations may timeout on some hosting platforms
 
 ## 🛠️ Future Enhancements
 
